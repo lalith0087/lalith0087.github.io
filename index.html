@@ -205,7 +205,7 @@ header::before{background:radial-gradient(420px 300px at var(--x) var(--y),color
 <header class="wrap" id="top">
   <span class="eyebrow"><b></b>OPEN TO ENTRY-LEVEL DS / ML ROLES · HYDERABAD</span>
   <h1>I build ML that <em>survives</em> <s>the notebook</s> production.</h1>
-  <p class="sub"><b>Lalith Vara Prasad Karampudi.</b> Fraud models with cost-tuned thresholds, agents that check their own answers, and a job queue that survives <b>kill -9</b>. My thirteen projects are below as a graph: drag them, hover a tool, <b>click a project to open its live demo</b>.</p>
+  <p class="sub"><b>Lalith Vara Prasad Karampudi.</b> Fraud models with cost-tuned thresholds, agents that check their own answers, and a job queue that survives <b>kill -9</b>. My fourteen projects are below as a graph: drag them, hover a tool, <b>click a project to open its live demo</b>.</p>
   <div class="cta">
     <a class="btn p" href="#graph">Explore the graph ↓</a>
     <a class="btn" href="resume.pdf" target="_blank" rel="noopener">Résumé ↗</a>
@@ -216,7 +216,7 @@ header::before{background:radial-gradient(420px 300px at var(--x) var(--y),color
 <main class="wrap">
   <div class="gwrap" id="graph">
     <span class="gtitle">my work as a graph</span>
-    <canvas id="g" aria-label="Interactive graph connecting my eight projects to the tools they use. The same content is listed below as case files."></canvas>
+    <canvas id="g" aria-label="Interactive graph connecting my fourteen projects to the tools they use. The same content is listed below as case files."></canvas>
     <div class="gbar">
       <span id="ginfo" aria-live="polite">Hover a node to see its connections. Click a project to open its live demo.</span>
       <span class="legend"><span><i style="background:var(--a)"></i>project</span><span><i style="border:1.5px solid var(--mute)"></i>tool</span></span>
@@ -283,6 +283,10 @@ var P=[
  tech:['Redis','FastAPI','Docker','GitHub Actions','pytest'],
  does:['<b>Atomic Lua dequeue</b>, leases with heartbeats, fencing tokens.','Exponential backoff, dead-letter queue, idempotency keys.','kill -9 chaos test done by hand; CI includes a Docker Compose smoke test.'],
  lim:['Not deployed to any cloud.','The chaos test is manual, not automated.'],repo:'Task-pipeline'},
+{id:'exp',short:'Experiment Toolkit',title:'Experiment-to-Decision Toolkit',tag:'Design, check, analyze and target an A/B test, with uncertainty on every number.',met:'39% → 2.7%',metl:'false positives under peeking, naive vs mSPRT',demo:'peek',kind:'sim',
+ tech:['scikit-learn','SciPy','pandas','GitHub Actions','pytest'],
+ does:['<b>Power and sample size, SRM check, CUPED</b> variance reduction, and <b>mSPRT</b> always-valid p-values so you can peek safely.','<b>T-, X- and doubly-robust uplift learners</b> scored with Qini curves, plus a profit-based targeting layer that picks the share to treat on one half of the data and measures it on the other, with bootstrap intervals.','Run on the randomized Hillstrom email experiment (64k customers): email lifted visits by 6.1 points.','15 tests that check statistical properties (CI coverage, Type I error under peeking), and CI on GitHub Actions.'],
+ lim:['<b>On Hillstrom, targeting did not provably beat emailing everyone.</b> Every interval for the difference included zero; the three learners were indistinguishable.','CUPED did almost nothing there (0.4% variance reduction); its 68% on synthetic data came from a covariate I built to be predictive.','The 39% vs 2.7% figure is from 300 simulated no-effect experiments, not real traffic.','The demo here is a re-creation in JavaScript, not the Python library.'],repo:'experiment-to-decision'},
 {id:'graphrag',short:'GraphRAG',title:'Second Brain GraphRAG',tag:'Local knowledge graph vs plain RAG, benchmarked honestly.',met:'0.75 = 0.75',metl:'GraphRAG vs plain RAG',demo:'graphrag',kind:'sim',
  tech:['Ollama','ChromaDB','NetworkX','FastAPI','GitHub Actions','pytest'],
  does:['Fully local: Ollama, ChromaDB, NetworkX, FastAPI.','GraphRAG won multi-hop (0.71 vs 0.57) and lost single-hop (0.8 vs 1.0).','7 offline tests and CI.'],
@@ -407,7 +411,52 @@ new MutationObserver(function(){draw()}).observe(root,{attributes:true,attribute
 matchMedia('(prefers-color-scheme:light)').addEventListener('change',function(){draw()});
 init();
 
-var DEMOS={fraud:demoFraud,queue:demoQueue,agent:demoAgent,graphrag:demoGraphrag,ast:demoAst,telco:demoTelco,bleu:demoBleu,gan:demoGan,'nb-movie':demoNb,'nb-credit':demoNb,xo:demoXo,cipher:demoCipher,fork:demoFork};
+var DEMOS={fraud:demoFraud,queue:demoQueue,agent:demoAgent,graphrag:demoGraphrag,ast:demoAst,telco:demoTelco,bleu:demoBleu,gan:demoGan,'nb-movie':demoNb,'nb-credit':demoNb,xo:demoXo,peek:demoPeek,cipher:demoCipher,fork:demoFork};
+
+/* ---------- demo: peeking vs mSPRT ---------- */
+function demoPeek(el){
+  el.innerHTML=shell('<b>LIVE</b> · why peeking breaks a t-test','simulated A/A tests in your browser, no real effect',
+   '<svg viewBox="0 0 560 230" class="pk" role="img" aria-label="Running p-values of a naive test and mSPRT on an experiment with no true effect"></svg>'+
+   '<div class="read"><div><b class="n1">-</b>naive test</div><div><b class="n2">-</b>mSPRT</div><div><b class="n3">0 runs</b>your tally</div></div>'+
+   '<button class="btn run" style="margin-top:12px">Run a new A/A test</button>',
+   'Each run draws 3,000 customers split 50/50 with <b>no real difference</b>, then checks the p-value after every customer. Dashed line = 0.05. A valid test should be fooled about 5% of the time or less; checking a normal z-test continuously fools it far more often. mSPRT uses a N(0, 0.2²) mixing prior and a plug-in variance, like the Python library.');
+  var q=function(s){return el.querySelector(s)},N=3000,TAU2=0.04,runs=0,fn=0,fs=0;
+  function gauss(){var u=1-Math.random(),v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+  function ncdf(z){var t=1/(1+0.2316419*Math.abs(z)),d=0.3989423*Math.exp(-z*z/2),p=d*t*(0.3193815+t*(-0.3565638+t*(1.781478+t*(-1.821256+t*1.330274))));return z>0?1-p:p}
+  function once(){
+    var nt=0,nc=0,st=0,sc=0,qt=0,qc=0,run=1,nv=[],sq=[],fnA=-1,fsA=-1;
+    for(var i=0;i<N;i++){
+      var t=Math.random()<.5,y=gauss();
+      if(t){nt++;st+=y;qt+=y*y}else{nc++;sc+=y;qc+=y*y}
+      var pn=1,ps=run;
+      if(nt>=30&&nc>=30){
+        var mt=st/nt,mc=sc/nc,th=mt-mc;
+        pn=2*(1-ncdf(Math.abs(th)/Math.sqrt(1/nt+1/nc)));
+        var vt=Math.max(qt/nt-mt*mt,1e-12),vc=Math.max(qc/nc-mc*mc,1e-12),V=vt/nt+vc/nc;
+        var lam=Math.sqrt(V/(V+TAU2))*Math.exp(TAU2*th*th/(2*V*(V+TAU2)));
+        run=Math.min(run,1/lam);ps=run;
+      }
+      nv.push(pn);sq.push(ps);
+      if(fnA<0&&pn<.05)fnA=i;if(fsA<0&&ps<.05)fsA=i;
+    }
+    return {nv:nv,sq:sq,fn:fnA,fs:fsA};
+  }
+  function line(a,col,w){var d='',st=6;for(var i=0;i<a.length;i+=st){d+=(i?'L':'M')+(30+i/N*510).toFixed(1)+' '+(10+(1-a[i])*190).toFixed(1)}return '<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="'+w+'"/>'}
+  function draw(){
+    var r=once(),y05=10+.95*190,g='';
+    g+='<line x1="30" x2="540" y1="'+y05+'" y2="'+y05+'" stroke="var(--mute)" stroke-dasharray="4 4"/><text x="34" y="'+(y05-4)+'" font-size="9" font-family="JetBrains Mono" fill="var(--mute)">0.05</text>';
+    g+='<line x1="30" x2="540" y1="200" y2="200" stroke="var(--line)"/>';
+    g+=line(r.nv,'var(--b)',1.1)+line(r.sq,'var(--a)',2);
+    if(r.fn>=0)g+='<circle cx="'+(30+r.fn/N*510)+'" cy="'+(10+(1-r.nv[r.fn])*190)+'" r="4" fill="var(--bad)"/>';
+    g+='<text x="30" y="219" font-size="9" font-family="JetBrains Mono" fill="var(--mute)">0</text><text x="540" y="219" text-anchor="end" font-size="9" font-family="JetBrains Mono" fill="var(--mute)">3,000 customers</text>';
+    q('.pk').innerHTML=g;
+    runs++;if(r.fn>=0)fn++;if(r.fs>=0)fs++;
+    q('.n1').textContent=r.fn>=0?'"significant" at n='+(r.fn+1):'never fooled';
+    q('.n2').textContent=r.fs>=0?'"significant" at n='+(r.fs+1):'never fooled';
+    q('.n3').textContent=runs+' runs: naive fooled '+fn+', mSPRT '+fs;
+  }
+  q('.run').onclick=draw;draw();return function(){};
+}
 /* ---------- drawer + routing ---------- */
 var dr=$('drawer'),scrim=$('scrim'),lastFocus=null,cleanup=null,curId=null;
 function openP(id,fromHash){
